@@ -1,0 +1,16 @@
+.dub
+docs.json
+__dummy.html
+docs/
+chime-converter.so
+chime-converter.dylib
+chime-converter.dll
+chime-converter.a
+chime-converter.lib
+chime-converter-test-*
+*.exe
+*.o
+*.obj
+*.lst
+in/
+out/
