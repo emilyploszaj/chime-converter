@@ -52,9 +52,8 @@ void main(string[] args) {
 
 void attemptConversion(string file) {
 	file = file.replace('\\', '/');
-	writefln("Converting file %s", file);
-
 	string[] lines = (cast(string) read(file)).split("\n");
+	
 	Identifier[] items;
 	Range[] counts;
 	Type type = Type.ITEM;
@@ -62,6 +61,7 @@ void attemptConversion(string file) {
 	string texture;
 	string model;
 
+	writefln("Converting file %s", file);
 	foreach (string line; lines) {
 		string[] parts = line.split("=");
 		if (parts.length > 1) {
