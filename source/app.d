@@ -39,13 +39,10 @@ void main(string[] args) {
 		writeln("Could not find optifine/mcpatcher folder");
 		return;
 	}
-
 	writefln("Generating Overrides");
-	// Generate override for each item
 	foreach (Identifier item, Override[] o; knownOverrides) {
 		generateOverride(item, o);
 	}
-
 	copy(filename ~ "/pack.mcmeta", "out/pack.mcmeta");
 	copy(filename ~ "/pack.png", "out/pack.png");
 }
@@ -53,7 +50,7 @@ void main(string[] args) {
 void attemptConversion(string file) {
 	file = file.replace('\\', '/');
 	string[] lines = (cast(string) read(file)).split("\n");
-	
+
 	Identifier[] items;
 	Range[] counts;
 	Type type = Type.ITEM;
