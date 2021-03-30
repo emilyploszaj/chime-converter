@@ -53,7 +53,6 @@ void main(string[] args) {
 }
 
 void attemptConversion(string file) {
-	
 	file = file.replace('\\', '/');
 	writefln("Converting file %s", file);
 
@@ -77,7 +76,6 @@ void attemptConversion(string file) {
 			if (name in forwards) {
 				name = forwards[name];
 			}
-
 			if (name == "type") {
 				try {
 					type = cast(Type) value;
@@ -101,8 +99,6 @@ void attemptConversion(string file) {
 			}
 		}
 	}
-
-
 	if (type == Type.ITEM) {
 		if (items.length == 0) {
 			writefln("Missing list of items for %s", file);
@@ -112,21 +108,17 @@ void attemptConversion(string file) {
 			if (texture.length == 0) {
 				texture = file.split('/')[$ - 1][0..$ - 11];
 			}
-
 			texture = chompPrefix(texture, "./");
-
 			if (texture.canFind('/')) {
 				texture = "assets/minecraft/" ~ texture;
 			} else {
 				texture = file.split('/')[0..$ - 1].join('/') ~ '/' ~ texture;
 			}
-
 			if (!texture.endsWith(".png")) {
 				texture ~= ".png";
 			}
-
 			generateStubModel(texture);
-			model = "%s:item/%s".format(namespace,sanitizeItemName(texture.split('/')[$ - 1][0..$ - 4]));
+			model = "%s:item/%s".format(namespace, sanitizeItemName(texture.split('/')[$ - 1][0..$ - 4]));
 		}
 		foreach (Identifier item; items) {
 			string[] predicates;
@@ -184,9 +176,7 @@ void generateOverride(Identifier item, Override[] overrides) {
 		.format(overrides
 			.map!(o => STUB_PREDICATE
 				.format(o.predicates.join(",\n"),o.model))
-			.array.join(",\n")
-		)
-	);
+			.array.join(",\n")));
 }
 
 struct Override {
