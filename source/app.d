@@ -28,7 +28,6 @@ void main(string[] args) {
 	if (!citDir.exists) {
 		citDir = filename ~ "/assets/minecraft/mcpatcher/cit";
 	}
-
 	if (citDir.exists && citDir.isDir) {
 		writefln("Found optifine/mcpatcher folder at: %s", citDir);
 		citDir.dirEntries(SpanMode.depth).each!((string file) {
@@ -41,7 +40,6 @@ void main(string[] args) {
 		return;
 	}
 
-	
 	writefln("Generating Overrides");
 	// Generate override for each item
 	foreach (Identifier item, Override[] o; knownOverrides) {
@@ -57,7 +55,6 @@ void attemptConversion(string file) {
 	writefln("Converting file %s", file);
 
 	string[] lines = (cast(string) read(file)).split("\n");
-
 	Identifier[] items;
 	Range[] counts;
 	Type type = Type.ITEM;
@@ -175,7 +172,7 @@ void generateOverride(Identifier item, Override[] overrides) {
 	std.file.write(path, STUB_OVERRIDE
 		.format(overrides
 			.map!(o => STUB_PREDICATE
-				.format(o.predicates.join(",\n"),o.model))
+				.format(o.predicates.join(",\n"), o.model))
 			.array.join(",\n")));
 }
 
