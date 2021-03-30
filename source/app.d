@@ -23,7 +23,7 @@ void main(string[] args) {
 
 	immutable filename = "in";
 
-	//allow for dir to be called 'optifine' or 'mcpatcher'
+	// Allow for dir to be called 'optifine' or 'mcpatcher'
 	string citDir = filename ~ "/assets/minecraft/optifine/cit";
 	if (!citDir.exists) {
 		citDir = filename ~ "/assets/minecraft/mcpatcher/cit";
@@ -31,7 +31,6 @@ void main(string[] args) {
 
 	if (citDir.exists && citDir.isDir) {
 		writefln("Found optifine/mcpatcher folder at: %s", citDir);
-		//attempt to convert all .properties files in dir
 		citDir.dirEntries(SpanMode.depth).each!((string file) {
 			if (file.endsWith(".properties")) {
 				attemptConversion(file);
@@ -44,19 +43,17 @@ void main(string[] args) {
 
 	
 	writefln("Generating Overrides");
-	//generate override for each item
+	// Generate override for each item
 	foreach (Identifier item, Override[] o; knownOverrides) {
 		generateOverride(item, o);
 	}
 
-	//copy other pack data
 	copy(filename ~ "/pack.mcmeta", "out/pack.mcmeta");
 	copy(filename ~ "/pack.png", "out/pack.png");
 }
 
 void attemptConversion(string file) {
 	
-	//read file
 	file = file.replace('\\', '/');
 	writefln("Converting file %s", file);
 
@@ -68,27 +65,24 @@ void attemptConversion(string file) {
 	Nbt nbt;
 	string texture;
 	string model;
-	
 
 	foreach (string line; lines) {
-		//parse line
 		string[] parts = line.split("=");
 		if (parts.length > 1) {
 			string name = parts[0].strip();
-			string value = parts[1 .. $].join("=").strip();
+			string value = parts[1..$].join("=").strip();
 			string[] splitname = name.split(".");
 
-			//check for aliases
+			// Check for aliases
 			if (name in forwards) {
 				name = forwards[name];
 			}
 
-			//check property type
 			if (name == "type") {
 				try {
 					type = cast(Type) value;
 				} catch (Exception e) {
-					writefln("	File %s used invalid type %s", file, value);
+					writefln("File %s used invalid type %s", file, value);
 					return;
 				}
 			} else if (name == "stackSize") {
@@ -102,7 +96,7 @@ void attemptConversion(string file) {
 			} else if (splitname[0] == "nbt") {
 				nbt = Nbt(splitname,value);
 			} else {
-				writefln("	Unrecognized property %s in %s", name, file);
+				writefln("Unrecognized property %s in %s", name, file);
 				return;
 			}
 		}
@@ -111,13 +105,12 @@ void attemptConversion(string file) {
 
 	if (type == Type.ITEM) {
 		if (items.length == 0) {
-			writefln("	Missing list of items for %s", file);
+			writefln("Missing list of items for %s", file);
 			return;
 		}
-		//parse  texture
 		if (model.length == 0) {
 			if (texture.length == 0) {
-				texture = file.split('/')[$ - 1][0 .. $ - 11];
+				texture = file.split('/')[$ - 1][0..$ - 11];
 			}
 
 			texture = chompPrefix(texture, "./");
@@ -125,7 +118,7 @@ void attemptConversion(string file) {
 			if (texture.canFind('/')) {
 				texture = "assets/minecraft/" ~ texture;
 			} else {
-				texture = file.split('/')[0 .. $ - 1].join('/') ~ '/' ~ texture;
+				texture = file.split('/')[0..$ - 1].join('/') ~ '/' ~ texture;
 			}
 
 			if (!texture.endsWith(".png")) {
@@ -133,10 +126,8 @@ void attemptConversion(string file) {
 			}
 
 			generateStubModel(texture);
-			model = "%s:item/%s".format(namespace,
-					sanitizeItemName(texture.split('/')[$ - 1][0 .. $ - 4]));
+			model = "%s:item/%s".format(namespace,sanitizeItemName(texture.split('/')[$ - 1][0..$ - 4]));
 		}
-
 		foreach (Identifier item; items) {
 			string[] predicates;
 			if (counts.length > 0) {
@@ -147,7 +138,6 @@ void attemptConversion(string file) {
 				foreach(string nbtelement; nbt.nbtpath) {
 					p = p.format(`"%s": `.format(nbtelement)~"{%s}");
 				}
-				//writeln(p);
 				p = p.replace("{%s}",`"%s"`.format(nbt.nbttag));
 				predicates ~= p;
 
@@ -159,11 +149,11 @@ void attemptConversion(string file) {
 			}
 		}
 	} else if (type == Type.ENCHANTMENT) {
-		writefln("	Chime currently does not support enchantment overrides, skipping %s", file);
+		writefln("Chime currently does not support enchantment overrides, skipping %s", file);
 	} else if (type == Type.ARMOR) {
-		writeln("	Chime converter does not yet support armor overrides, skipping %s", file);
+		writeln("Chime converter does not yet support armor overrides, skipping %s", file);
 	} else if (type == Type.ELYTRA) {
-		writefln("	Chime currently does not support elytra overrides, skipping %s", file);
+		writefln("Chime currently does not support elytra overrides, skipping %s", file);
 	}
 }
 
@@ -172,7 +162,7 @@ string sanitizeItemName(string name) {
 }
 
 void generateStubModel(string texture) {
-	string itemName = sanitizeItemName(texture.split('/')[$ - 1][0 .. $ - 4]);
+	string itemName = sanitizeItemName(texture.split('/')[$ - 1][0..$ - 4]);
 	string path = "out/assets/%s/models/item".format(namespace);
 	path.mkdirRecurse;
 	path ~= "/%s.json".format(itemName);
@@ -187,19 +177,14 @@ void generateStubModel(string texture) {
 }
 
 void generateOverride(Identifier item, Override[] overrides) {
-	//writefln("Generationg Override");
-	//writeln(overrides);
 	string path = "out/assets/%s/overrides/item".format(item.namespace);
 	path.mkdirRecurse();
 	path ~= "/%s.json".format(item.path);
-	std.file.write(path,
-		STUB_OVERRIDE.format(
-			overrides.map!(
-				o => STUB_PREDICATE.format(
-					o.predicates.join(",\n"),
-					o.model
-				)
-			).array.join(",\n")
+	std.file.write(path, STUB_OVERRIDE
+		.format(overrides
+			.map!(o => STUB_PREDICATE
+				.format(o.predicates.join(",\n"),o.model))
+			.array.join(",\n")
 		)
 	);
 }
