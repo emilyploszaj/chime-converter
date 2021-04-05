@@ -1,5 +1,6 @@
 import std.algorithm;
 import std.array;
+import std.conv;
 import std.file;
 import std.format;
 import std.regex;
@@ -53,8 +54,9 @@ void attemptConversion(string file) {
 
 	Identifier[] items;
 	Range[] counts;
+	Range[] damages;
+	Nbt[] nbts;
 	Type type = Type.ITEM;
-	Nbt nbt;
 	string texture;
 	string model;
 
@@ -81,14 +83,18 @@ void attemptConversion(string file) {
 				counts = value.split(' ').map!(v => Range(v)).array;
 			} else if (name == "items") {
 				items = value.split(' ').map!(v => Identifier(v)).array;
-			} else if (name == "texture") {
+			} else if (name == "texture" || splitname[0] == "texture") {
 				texture = value;
+			} else if (name == "damage") {	
+				damages = value.split(' ').map!(v => Range(v)).array;	
 			} else if (name == "model") {
 				model = value;
 			} else if (splitname[0] == "nbt") {
-				nbt = Nbt(splitname,value);
+				nbts ~= Nbt(splitname,value);
+			} else if (name == "weight") {
+				writefln("Chime does not support property %s", name);
 			} else {
-				writefln("Unrecognized property %s in %s", name, file);
+				writefln("Unrecognized property %s", name);
 				return;
 			}
 		}
@@ -113,20 +119,43 @@ void attemptConversion(string file) {
 			}
 			generateStubModel(texture);
 			model = "%s:item/%s".format(namespace, sanitizeItemName(texture.split('/')[$ - 1][0..$ - 4]));
+		} else {
+			if (model.endsWith(".json")) {
+				model = model[0..$ - 5];
+			}
+			//TODO Copy actual model
+			model = "%s:item/%s".format(namespace, sanitizeItemName(model.split('/')[$ - 1]));
 		}
 		foreach (Identifier item; items) {
 			string[] predicates;
 			if (counts.length > 0) {
 				predicates ~= `"count": "%s"`.format(counts[0].chimeRange);
 			}
-			if (nbt.nbttag) {
-				string p = "%s";
-				foreach(string nbtelement; nbt.nbtpath) {
-					p = p.format(`"%s": `.format(nbtelement)~"{%s}");
-				}
-				p = p.replace("{%s}",`"%s"`.format(nbt.nbttag));
-				predicates ~= p;
+			if (damages.length > 0) {
+				predicates ~= `"damage": %s`.format(damages[0].chimeRange);
+			}
+			if (nbts.length > 0) {
+				foreach (Nbt nbt; nbts) {
+					string nbtData = nbt.nbttag.split(':')[$ - 1];
+					
+					if (matchFirst(nbt.nbttag,"i?pattern|i?regex")) {
+						if (matchFirst(nbt.nbttag,"i?pattern")) {
+						nbtData = nbtData.replace("*",".*");
+						}
 
+						if (startsWith(nbt.nbttag,"i")) {
+							nbt.nbttag = "(?i)%s".format(nbtData);
+						}
+						nbt.nbttag = "/%s/".format(nbtData);
+					}
+
+					string p = "%s";
+					foreach(string nbtelement; nbt.nbtpath) {
+						p = p.format(`"%s": `.format(nbtelement)~"{%s}");
+					}
+					p = p.replace("{%s}",`"%s"`.format(nbt.nbttag));
+					predicates ~= p;
+				}
 			}
 			if (!(item in knownOverrides)) {
 				knownOverrides[item] = [Override(predicates, model)];
@@ -137,7 +166,7 @@ void attemptConversion(string file) {
 	} else if (type == Type.ENCHANTMENT) {
 		writefln("Chime currently does not support enchantment overrides, skipping %s", file);
 	} else if (type == Type.ARMOR) {
-		writeln("Chime converter does not yet support armor overrides, skipping %s", file);
+		writefln("Chime converter does not yet support armor overrides, skipping %s", file);
 	} else if (type == Type.ELYTRA) {
 		writefln("Chime currently does not support elytra overrides, skipping %s", file);
 	}
@@ -163,6 +192,7 @@ void generateStubModel(string texture) {
 }
 
 void generateOverride(Identifier item, Override[] overrides) {
+	writeln("Generating Override for %s".format(item));
 	string path = "out/assets/%s/overrides/item".format(item.namespace);
 	path.mkdirRecurse();
 	path ~= "/%s.json".format(item.path);
