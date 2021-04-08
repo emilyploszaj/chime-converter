@@ -17,12 +17,13 @@ string namespace = "converted";
 
 Override[][Identifier] knownOverrides;
 
+immutable filename = "in";
+immutable outFilename = "out";
+
 void main(string[] args) {
 	forwards["matchItems"] = "items";
 	forwards["matchItem"] = "items"; // Is this even valid cit?
 	forwards["tile"] = "texture";
-
-	immutable filename = "in";
 
 	// Allow for dir to be called 'optifine' or 'mcpatcher'
 	string citDir = filename ~ "/assets/minecraft/optifine/cit";
@@ -40,7 +41,7 @@ void main(string[] args) {
 		writeln("Could not find optifine/mcpatcher folder");
 		return;
 	}
-	writefln("Generating Overrides");
+	writeln("\nGenerating Overrides");
 	foreach (Identifier item, Override[] o; knownOverrides) {
 		generateOverride(item, o);
 	}
@@ -105,6 +106,7 @@ void attemptConversion(string file) {
 			return;
 		}
 		if (model.length == 0) {
+			//generate a model
 			if (texture.length == 0) {
 				texture = file.split('/')[$ - 1][0..$ - 11];
 			}
@@ -120,11 +122,35 @@ void attemptConversion(string file) {
 			generateStubModel(texture);
 			model = "%s:item/%s".format(namespace, sanitizeItemName(texture.split('/')[$ - 1][0..$ - 4]));
 		} else {
-			if (model.endsWith(".json")) {
-				model = model[0..$ - 5];
+			//custom model
+			model = chompPrefix(model, "./");
+			if (!model.endsWith(".json")) {
+				model ~= ".json";
 			}
-			//TODO Copy actual model
-			model = "%s:item/%s".format(namespace, sanitizeItemName(model.split('/')[$ - 1]));
+			string modelFromPath = (file.split('/')[0..$ - 1]~model).join('/');
+			string modelToPath = "%s/assets/%s/models/item".format(outFilename,namespace);
+			modelToPath.mkdirRecurse();
+			modelToPath ~= "/%s".format(model);
+			string modelFile = cast(string) read(modelFromPath);
+			auto texturePos = indexOf(modelFile, `"layer0"`, 0);
+			if (texturePos != -1) {
+				texturePos = indexOf(modelFile, `"`, texturePos + 8) + 1;
+				auto textureEndPos = indexOf(modelFile, `"`, texturePos + 1);
+				string texturePath = modelFile[texturePos..textureEndPos].chompPrefix("./").chomp(".png");
+				texture = texturePath.split("/")[$ - 1];
+				if (indexOf(texturePath, "/", 0) != -1) {
+					texturePath = "%s/assets/minecraft/%s.png".format(filename,texturePath);
+				} else {
+					texturePath = modelFromPath[0..modelFromPath.lastIndexOf("/")+1]~"%s.png".format(texture);
+				}
+				copyTexture(texturePath,generatePath(namespace, "textures") ~ "/%s.png".format(texture));
+				string editedModel = modelFile[0..texturePos]~"%s:item/%s".format(namespace,texture)~modelFile[textureEndPos..$];
+				std.file.write(modelToPath,editedModel);
+			} else {
+				writeln("Chime Converter does not support custom models without a texture");
+				return;
+			}
+			model = "%s:item/%s".format(namespace, sanitizeItemName(model.split('/')[$ - 1][0..$ - 5]));
 		}
 		foreach (Identifier item; items) {
 			string[] predicates;
@@ -178,13 +204,18 @@ string sanitizeItemName(string name) {
 
 void generateStubModel(string texture) {
 	string itemName = sanitizeItemName(texture.split('/')[$ - 1][0..$ - 4]);
-	string path = "out/assets/%s/models/item".format(namespace);
-	path.mkdirRecurse;
-	path ~= "/%s.json".format(itemName);
-	std.file.write(path, STUB_MODEL.format(namespace, itemName));
-	path = "out/assets/%s/textures/item".format(namespace);
-	path.mkdirRecurse;
-	path ~= "/%s.png".format(itemName);
+	std.file.write(generatePath(namespace, "models") ~ "/%s.%s".format(itemName, "json"), STUB_MODEL
+		.format(namespace, itemName));
+	copyTexture(texture,generatePath(namespace, "textures")~"/%s.%s".format(itemName, "png"));
+}
+
+string generatePath(string nspace, string type) {
+	string path = "%s/assets/%s/%s/item".format(outFilename,nspace,type);
+	path.mkdirRecurse();
+	return path;
+}
+
+void copyTexture(string texture, string path) {
 	copy(texture, path);
 	if (exists(texture ~ ".mcmeta")) {
 		copy(texture ~ ".mcmeta", path ~ ".mcmeta");
@@ -192,11 +223,8 @@ void generateStubModel(string texture) {
 }
 
 void generateOverride(Identifier item, Override[] overrides) {
-	writeln("Generating Override for %s".format(item));
-	string path = "out/assets/%s/overrides/item".format(item.namespace);
-	path.mkdirRecurse();
-	path ~= "/%s.json".format(item.path);
-	std.file.write(path, STUB_OVERRIDE
+	writefln("Generating Override for %s",item);
+	std.file.write(generatePath(item.namespace, "overrides")~"/%s.%s".format(item.path, "json"), STUB_OVERRIDE
 		.format(overrides
 			.map!(o => STUB_PREDICATE
 				.format(o.predicates.join(",\n"), o.model))
