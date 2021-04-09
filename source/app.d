@@ -42,6 +42,7 @@ void main(string[] args) {
 		return;
 	}
 	writeln("\nGenerating Overrides");
+	
 	foreach (Identifier item, Override[] o; knownOverrides) {
 		generateOverride(item, o);
 	}
@@ -60,6 +61,7 @@ void attemptConversion(string file) {
 	Type type = Type.ITEM;
 	string texture;
 	string model;
+	int weight = 0;
 
 	writefln("Converting file %s", file);
 	foreach (string line; lines) {
@@ -93,6 +95,8 @@ void attemptConversion(string file) {
 			} else if (splitname[0] == "nbt") {
 				nbts ~= Nbt(splitname,value);
 			} else if (name == "weight") {
+				weight = parse!int(value);
+			} else if (name == "useGlint") {
 				writefln("Chime does not support property %s", name);
 			} else {
 				writefln("Unrecognized property %s", name);
@@ -184,9 +188,9 @@ void attemptConversion(string file) {
 				}
 			}
 			if (!(item in knownOverrides)) {
-				knownOverrides[item] = [Override(predicates, model)];
+				knownOverrides[item] = [Override(predicates, model, weight)];
 			} else {
-				knownOverrides[item] ~= Override(predicates, model);
+				knownOverrides[item] ~= Override(predicates, model, weight);
 			}
 		}
 	} else if (type == Type.ENCHANTMENT) {
@@ -224,6 +228,7 @@ void copyTexture(string texture, string path) {
 
 void generateOverride(Identifier item, Override[] overrides) {
 	writefln("Generating Override for %s",item);
+	sort!((a,b)=>a.weight < b.weight)(overrides);
 	std.file.write(generatePath(item.namespace, "overrides")~"/%s.%s".format(item.path, "json"), STUB_OVERRIDE
 		.format(overrides
 			.map!(o => STUB_PREDICATE
@@ -234,6 +239,7 @@ void generateOverride(Identifier item, Override[] overrides) {
 struct Override {
 	string[] predicates;
 	string model;
+	int weight;
 }
 
 struct Nbt {
