@@ -42,7 +42,6 @@ void main(string[] args) {
 		return;
 	}
 	writeln("\nGenerating Overrides");
-	
 	foreach (Identifier item, Override[] o; knownOverrides) {
 		generateOverride(item, o);
 	}
@@ -109,6 +108,12 @@ void attemptConversion(string file) {
 			writefln("Missing list of items for %s", file);
 			return;
 		}
+		for (int i = 0; i < items.length; i++) {
+			if (items[i].path == "skull") {
+				items[i].path = "player_head";
+				damages = [];
+			}
+		}
 		if (model.length == 0) {
 			//generate a model
 			if (texture.length == 0) {
@@ -174,7 +179,7 @@ void attemptConversion(string file) {
 						}
 
 						if (startsWith(nbt.nbttag,"i")) {
-							nbt.nbttag = "(?i)%s".format(nbtData);
+							nbtData = "(?i)%s".format(nbtData);
 						}
 						nbt.nbttag = "/%s/".format(nbtData);
 					}
