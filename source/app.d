@@ -8,6 +8,7 @@ import std.stdio;
 import std.string;
 
 immutable string STUB_MODEL = import("stubModel.json");
+immutable string STUB_MODEL_HANDHELD = import("stubModelHandheld.json");
 immutable string STUB_OVERRIDE = import("stubOverride.json");
 immutable string STUB_PREDICATE = import("stubPredicate.json");
 
@@ -120,39 +121,54 @@ void attemptConversion(string file) {
 				texture = file.split('/')[$ - 1][0..$ - 11];
 			}
 			texture = chompPrefix(texture, "./");
-			if (texture.canFind('/')) {
-				texture = "assets/minecraft/" ~ texture;
-			} else {
-				texture = file.split('/')[0..$ - 1].join('/') ~ '/' ~ texture;
-			}
 			if (!texture.endsWith(".png")) {
 				texture ~= ".png";
 			}
-			generateStubModel(texture);
-			model = "%s:item/%s".format(namespace, sanitizeItemName(texture.split('/')[$ - 1][0..$ - 4]));
+			if (texture.canFind('/')) {
+				try {
+					texture = "assets/minecraft/" ~ texture;
+					copyTexture(texture);
+				} catch(FileException e) {
+					texture = file.split('/')[0..$ - 1].join('/') ~ '/' ~ texture;
+					copyTexture(texture);
+				}
+			} else {
+				texture = file.split('/')[0..$ - 1].join('/') ~ '/' ~ texture;
+				copyTexture(texture);
+			}
+			string itemName = sanitizeItemName(texture.split('/')[$ - 1].chomp(".png"));
+			generateStubModel(items, itemName);
+			model = "%s:item/%s".format(namespace, itemName);
 		} else {
 			//custom model
 			model = chompPrefix(model, "./");
 			if (!model.endsWith(".json")) {
 				model ~= ".json";
 			}
-			string modelFromPath = (file.split('/')[0..$ - 1]~model).join('/');
-			string modelToPath = "%s/assets/%s/models/item".format(outFilename,namespace);
-			modelToPath.mkdirRecurse();
-			modelToPath ~= "/%s".format(model);
+			string modelFromPath = (file.split('/')[0..$ - 1] ~ model).join('/');
+			string modelToPath = generatePath(namespace, "models")~"/%s".format(model);
 			string modelFile = cast(string) read(modelFromPath);
 			auto texturePos = indexOf(modelFile, `"layer0"`, 0);
 			if (texturePos != -1) {
 				texturePos = indexOf(modelFile, `"`, texturePos + 8) + 1;
 				auto textureEndPos = indexOf(modelFile, `"`, texturePos + 1);
-				string texturePath = modelFile[texturePos..textureEndPos].chompPrefix("./").chomp(".png");
-				texture = texturePath.split("/")[$ - 1];
-				if (indexOf(texturePath, "/", 0) != -1) {
-					texturePath = "%s/assets/minecraft/%s.png".format(filename,texturePath);
+				if (!texture) {
+					texture = modelFile[texturePos..textureEndPos].chompPrefix("./").chomp(".png");
+					if (texture.canFind('/')) {
+						texture = "%s/assets/minecraft/%s.png".format(filename,texture);
+					} else {
+						texture = modelFromPath[0..modelFromPath.lastIndexOf("/")+1]~"%s.png".format(texture);
+					}
 				} else {
-					texturePath = modelFromPath[0..modelFromPath.lastIndexOf("/")+1]~"%s.png".format(texture);
+					texture = texture.chompPrefix("./").chomp(".png")~".png";
+					if (texture.canFind('/')) {
+						texture = "%s/assets/minecraft/%s".format(filename,texture);
+					} else {
+						texture = (file.split('/')[0..$ - 1] ~ texture).join('/');
+					}
 				}
-				copyTexture(texturePath,generatePath(namespace, "textures") ~ "/%s.png".format(texture));
+				copyTexture(texture);
+				texture = texture.split("/")[$ - 1].chomp(".png");
 				string editedModel = modelFile[0..texturePos]~"%s:item/%s".format(namespace,texture)~modelFile[textureEndPos..$];
 				std.file.write(modelToPath,editedModel);
 			} else {
@@ -211,11 +227,16 @@ string sanitizeItemName(string name) {
 	return name.replaceAll(ctRegex!"[^a-z0-9\\/._-]", "_");
 }
 
-void generateStubModel(string texture) {
-	string itemName = sanitizeItemName(texture.split('/')[$ - 1][0..$ - 4]);
-	std.file.write(generatePath(namespace, "models") ~ "/%s.%s".format(itemName, "json"), STUB_MODEL
+void generateStubModel(Identifier[] vanillaItems, string itemName) {
+	string stub = STUB_MODEL;
+	foreach (Identifier vanillaItem; vanillaItems) {
+		writeln(vanillaItem.path);
+		if (matchFirst(vanillaItem.path, ".*(_pickaxe|_axe|_sword|_shovel)")) {	
+			stub = STUB_MODEL_HANDHELD;
+		}
+	}
+	std.file.write(generatePath(namespace, "models") ~ "/%s.%s".format(itemName, "json"), stub
 		.format(namespace, itemName));
-	copyTexture(texture,generatePath(namespace, "textures")~"/%s.%s".format(itemName, "png"));
 }
 
 string generatePath(string nspace, string type) {
@@ -224,7 +245,13 @@ string generatePath(string nspace, string type) {
 	return path;
 }
 
-void copyTexture(string texture, string path) {
+void copyTexture(string texture) {
+	string itemName = sanitizeItemName(texture.split('/')[$ - 1].chomp(".png"));
+	string path = generatePath(namespace, "textures") ~ "/%s.png".format(itemName);
+	if (itemName == "null") {
+		writefln("Skipping copying "~texture);
+		return;
+	}
 	copy(texture, path);
 	if (exists(texture ~ ".mcmeta")) {
 		copy(texture ~ ".mcmeta", path ~ ".mcmeta");
