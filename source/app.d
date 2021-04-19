@@ -231,7 +231,7 @@ void generateStubModel(Identifier[] vanillaItems, string itemName) {
 	string stub = STUB_MODEL;
 	foreach (Identifier vanillaItem; vanillaItems) {
 		writeln(vanillaItem.path);
-		if (matchFirst(vanillaItem.path, ".*(_pickaxe|_axe|_sword|_shovel)")) {	
+		if (matchFirst(vanillaItem.path, ".*(_pickaxe|_axe|_sword|_shovel|_hoe)")) {	
 			stub = STUB_MODEL_HANDHELD;
 		}
 	}
