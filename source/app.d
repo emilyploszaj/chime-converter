@@ -110,7 +110,7 @@ void attemptConversion(string file) {
 		}
 	}
 	if (type == Type.ITEM) {
-		string subPath = file.split("/")[citDir.split("/").length..$-1].join("/");
+		string subPath = sanitize(file.split("/")[citDir.split("/").length..$-1].join("/"));
 		if (items.length == 0) {
 			writefln("Missing list of items for %s", file);
 			return;
@@ -142,7 +142,7 @@ void attemptConversion(string file) {
 				texture = file.split('/')[0..$ - 1].join('/') ~ '/' ~ texture;
 				copyTexture(texture, subPath);
 			}
-			string itemName = sanitizeItemName(texture.split('/')[$ - 1].chomp(".png"));
+			string itemName = sanitize(texture.split('/')[$ - 1].chomp(".png"));
 			generateStubModel(items, itemName, subPath);
 			model = "%s:item/%s/%s".format(namespace, subPath, itemName);
 		} else {
@@ -183,7 +183,7 @@ void attemptConversion(string file) {
 				writeln("Chime Converter does not support custom models without a texture");
 				return;
 			}
-			model = "%s:item/%s/%s".format(namespace, subPath, sanitizeItemName(model.split('/')[$ - 1][0..$ - 5]));
+			model = "%s:item/%s/%s".format(namespace, subPath, sanitize(model.split('/')[$ - 1][0..$ - 5]));
 		}
 		foreach (Identifier item; items) {
 			string[] predicates;
@@ -195,7 +195,7 @@ void attemptConversion(string file) {
 			}
 			if (nbts.length > 0) {
 				foreach (Nbt nbt; nbts) {
-					string nbtData = nbt.nbttag.split(':')[$ - 1];
+					string nbtData = nbt.nbttag.split(':')[1..$].join(":");
 					
 					if (matchFirst(nbt.nbttag,"i?pattern|i?regex")) {
 						if (matchFirst(nbt.nbttag,"i?pattern")) {
@@ -231,7 +231,7 @@ void attemptConversion(string file) {
 	}
 }
 
-string sanitizeItemName(string name) {
+string sanitize(string name) {
 	return name.replaceAll(ctRegex!"[^a-z0-9\\/._-]", "_");
 }
 
@@ -247,7 +247,7 @@ void generateStubModel(Identifier[] vanillaItems, string itemName, string subPat
 }
 
 void copyTexture(string texture, string subPath) {
-	string itemName = sanitizeItemName(texture.split('/')[$ - 1].chomp(".png"));
+	string itemName = sanitize(texture.split('/')[$ - 1].chomp(".png"));
 	string path = generatePath(namespace, "textures", "item", subPath) ~ "/%s.png".format(itemName);
 	if (itemName == "null") {
 		writefln("Skipping copying "~texture);
