@@ -77,157 +77,104 @@ void attemptConversion(string file) {
 			if (name in forwards) {
 				name = forwards[name];
 			}
-			if (name == "type") {
-				try {
-					type = cast(Type) value;
-				} catch (Exception e) {
-					writefln("File %s used invalid type %s", file, value);
-					return;
-				}
-			} else if (name == "stackSize") {
-				counts = value.split(' ').map!(v => Range(v)).array;
-			} else if (name == "items") {
-				items = value.split(' ').map!(v => Identifier(v)).array;
-			} else if (name == "texture") {
-				texture = value;
-			} else if (splitname[0] == "texture") {
-				//writefln("special texture %s",splitname);
-				return;
-			} else if (name == "damage") {	
-				damages = value.split(' ').map!(v => Range(v)).array;	
-			} else if (name == "model") {
-				model = value;
-			} else if (splitname[0] == "nbt") {
-				nbts ~= Nbt(splitname,value);
-			} else if (name == "weight") {
-				weight = parse!int(value);
-			} else if (name == "useGlint") {
-				writefln("Chime does not support property %s", name);
-			} else {
-				writefln("Unrecognized property %s", name);
-				return;
+			switch(name) {
+				case "type":
+					try {
+						type = cast(Type) value;
+					} catch (Exception e) {
+						writefln("File %s used invalid type %s", file, value);
+						return;
+					}
+					break;
+				case "stackSize":
+					counts = value.split(' ').map!(v => Range(v)).array;
+					break;
+				case "items":
+					items = value.split(' ').map!(v => Identifier(v)).array;
+					break;
+				case "texture":
+					texture = value;
+					break;	
+				case "damage":	
+					damages = value.split(' ').map!(v => Range(v)).array;	
+					break;
+				case "model":
+					model = value;
+					break;
+				case "weight":
+					weight = parse!int(value);
+					break;
+				case "useGlint":
+					writefln("Chime does not support property %s", name);
+					break;
+				default:
+					if (splitname[0] == "texture") {
+						//writefln("special texture %s",splitname);
+						return;
+					} else if (splitname[0] == "nbt") {
+						nbts ~= Nbt(splitname,value);
+					} else {
+						writefln("Unrecognized property %s", name);
+						return;
+					}
 			}
 		}
 	}
-	if (type == Type.ITEM) {
-		string subPath = sanitize(file.split("/")[citDir.split("/").length..$-1].join("/"));
-		if (items.length == 0) {
-			writefln("Missing list of items for %s", file);
-			return;
-		}
-		for (int i = 0; i < items.length; i++) {
-			if (items[i].path == "skull") {
-				items[i].path = "player_head";
-				damages = [];
-			}
-		}
-		if (model.length == 0) {
-			//generate a model
-			if (texture.length == 0) {
-				texture = file.split('/')[$ - 1][0..$ - 11];
-			}
-			texture = chompPrefix(texture, "./");
-			if (!texture.endsWith(".png")) {
-				texture ~= ".png";
-			}
-			if (texture.canFind('/')) {
-				try {
-					texture = "assets/minecraft/" ~ texture;
-					copyTexture(texture, subPath);
-				} catch(FileException e) {
-					texture = file.split('/')[0..$ - 1].join('/') ~ '/' ~ texture;
-					copyTexture(texture, subPath);
-				}
-			} else {
-				texture = file.split('/')[0..$ - 1].join('/') ~ '/' ~ texture;
-				copyTexture(texture, subPath);
-			}
-			string itemName = sanitize(texture.split('/')[$ - 1].chomp(".png"));
-			generateStubModel(items, itemName, subPath);
-			model = "%s:item/%s/%s".format(namespace, subPath, itemName);
-		} else {
-			//custom model
-			model = chompPrefix(model, "./");
-			if (!model.endsWith(".json")) {
-				model ~= ".json";
-			}
-			string modelFromPath = (file.split('/')[0..$ - 1] ~ model).join('/');
-			string modelToPath = generatePath(namespace, "models", "item", subPath)~"/%s".format(model);
-			string modelFile = cast(string) read(modelFromPath);
-			auto texturePos = indexOf(modelFile, `"layer0"`, 0);
-			if (texturePos != -1) {
-				texturePos = indexOf(modelFile, `"`, texturePos + 8) + 1;
-				auto textureEndPos = indexOf(modelFile, `"`, texturePos + 1);
-				if (!texture) {
-					texture = modelFile[texturePos..textureEndPos].chompPrefix("./").chomp(".png");
-					if (texture.canFind('/')) {
-						texture = "%s/assets/minecraft/%s.png".format(filename,texture);
-					} else {
-						texture = modelFromPath[0..modelFromPath.lastIndexOf("/")+1]~"%s.png".format(texture);
-					}
-				} else {
-					texture = texture.chompPrefix("./").chomp(".png")~".png";
-					if (texture.canFind('/')) {
-						texture = "%s/assets/minecraft/%s".format(filename,texture);
-					} else {
-						texture = (file.split('/')[0..$ - 1] ~ texture).join('/');
-					}
-				}
-				copyTexture(texture, subPath);
-				texture = texture.split("/")[$ - 1].chomp(".png");
-				string editedModel = modelFile[0..texturePos] ~
-					"%s:item/%s".format(namespace, subPath ~ "/" ~ texture) ~
-					modelFile[textureEndPos..$];
-				std.file.write(modelToPath,editedModel);
-			} else {
-				writeln("Chime Converter does not support custom models without a texture");
+	string subPath = sanitize(file.split("/")[citDir.split("/").length..$-1].join("/"));
+	switch(type){
+		case Type.ITEM:
+
+			if (items.length == 0) {
+				writefln("Missing list of items for %s", file);
 				return;
 			}
-			model = "%s:item/%s/%s".format(namespace, subPath, sanitize(model.split('/')[$ - 1][0..$ - 5]));
-		}
-		foreach (Identifier item; items) {
-			string[] predicates;
-			if (counts.length > 0) {
-				predicates ~= `"count": "%s"`.format(counts[0].chimeRange);
-			}
-			if (damages.length > 0) {
-				predicates ~= `"damage": %s`.format(damages[0].chimeRange);
-			}
-			if (nbts.length > 0) {
-				foreach (Nbt nbt; nbts) {
-					string nbtData = nbt.nbttag.split(':')[1..$].join(":");
-					
-					if (matchFirst(nbt.nbttag,"i?pattern|i?regex")) {
-						if (matchFirst(nbt.nbttag,"i?pattern")) {
-						nbtData = nbtData.replace("*",".*");
-						}
-
-						if (startsWith(nbt.nbttag,"i")) {
-							nbtData = "(?i)%s".format(nbtData);
-						}
-						nbt.nbttag = "/%s/".format(nbtData);
-					}
-
-					string p = "%s";
-					foreach(string nbtelement; nbt.nbtpath) {
-						p = p.format(`"%s": `.format(nbtelement)~"{%s}");
-					}
-					p = p.replace("{%s}",`"%s"`.format(nbt.nbttag));
-					predicates ~= p;
+			
+			if (model.length == 0) {
+				//generate a model
+				model = generateModel(items, texture, file.split('/'), subPath);
+			} else {
+				//custom model
+				try {
+					model = editModel(model, texture, file.split('/'), subPath);
+				} catch (Exception e) {
+					writeln(e);
 				}
 			}
-			if (!(item in knownOverrides)) {
-				knownOverrides[item] = [Override(predicates, model, weight)];
-			} else {
-				knownOverrides[item] ~= Override(predicates, model, weight);
+
+			foreach (Identifier item; items) {
+				if (item.path == "skull") {
+					item.path = "player_head";
+					damages = [];
+				}
+				string[] predicates;
+				if (counts.length > 0) {
+					predicates ~= `"count": "%s"`.format(counts[0].chimeRange);
+				}
+				if (damages.length > 0) {
+					predicates ~= `"damage": %s`.format(damages[0].chimeRange);
+				}
+				if (nbts.length > 0) {
+					predicates ~= nbts.map!(generatePredicateNbt).array;
+				}
+				if (!(item in knownOverrides)) {
+					knownOverrides[item] = [Override(predicates, model, weight, Type.ITEM)];
+				} else {
+					knownOverrides[item] ~= Override(predicates, model, weight, Type.ITEM);
+				}
 			}
-		}
-	} else if (type == Type.ENCHANTMENT) {
-		writefln("Chime currently does not support enchantment overrides, skipping %s", file);
-	} else if (type == Type.ARMOR) {
-		writefln("Chime converter does not yet support armor overrides, skipping %s", file);
-	} else if (type == Type.ELYTRA) {
-		writefln("Chime currently does not support elytra overrides, skipping %s", file);
+			break;
+		case "block":	
+		case Type.ARMOR:
+			writefln("Chime converter does not yet support armor overrides, skipping %s", file);
+			break;
+		case Type.ENCHANTMENT:
+			writefln("Chime currently does not support enchantment overrides, skipping %s", file);
+			break;
+		case Type.ELYTRA:
+			writefln("Chime currently does not support elytra overrides, skipping %s", file);
+			break;
+		default:
+			throw new Exception("Cannot type %s".format(type));
 	}
 }
 
@@ -235,16 +182,77 @@ string sanitize(string name) {
 	return name.replaceAll(ctRegex!"[^a-z0-9\\/._-]", "_");
 }
 
-void generateStubModel(Identifier[] vanillaItems, string itemName, string subPath) {
+string generateModel(Identifier[] vanillaItems, string texture, string[] path, string subPath) {
+	if (texture.length == 0) {
+		texture = path[$ - 1][0..$ - 11];
+	}
+	texture = chompPrefix(texture, "./");
+	if (!texture.endsWith(".png")) {
+		texture ~= ".png";
+	}
+	try {
+		copyTexture("assets/minecraft/" ~ texture, subPath);
+	} catch(FileException e) {
+		texture = path[0..$ - 1].join('/') ~ '/' ~ texture;
+		copyTexture(texture, subPath);
+	}
+	string itemName = sanitize(texture.split('/')[$ - 1].chomp(".png"));
 	string stub = STUB_MODEL;
 	foreach (Identifier vanillaItem; vanillaItems) {
 		if (matchFirst(vanillaItem.path, ".*(_pickaxe|_axe|_sword|_shovel|_hoe)")) {	
 			stub = STUB_MODEL_HANDHELD;
 		}
 	}
-	std.file.write(generatePath(namespace, "models", "item", subPath) ~ "/%s.%s".format(itemName, "json"), stub
+	string file = generatePath(namespace, "models", "item", subPath) ~ "/%s.%s".format(itemName, "json");
+
+	std.file.write(file, stub
 		.format(namespace, subPath~"/"~itemName));
+
+	return "%s:item/%s/%s".format(namespace, subPath, itemName);
 }
+
+string editModel(string model, string texture, string[] path, string subPath) {
+
+
+	model = chompPrefix(model, "./");
+	if (!model.endsWith(".json")) {
+		model ~= ".json";
+	}
+	string modelFromPath = (path[0..$ - 1] ~ model).join('/');
+	string modelToPath = generatePath(namespace, "models", "item", subPath)~"/%s".format(model);
+	string modelFile = cast(string) read(modelFromPath);
+	auto texturePos = indexOf(modelFile, `"layer0"`, 0);
+	if (texturePos == -1) {
+		throw new Exception("Chime Converter does not support custom models without a texture");
+	}
+	texturePos = indexOf(modelFile, `"`, texturePos + 8) + 1;
+	auto textureEndPos = indexOf(modelFile, `"`, texturePos + 1);
+		
+	if (!texture) {
+			texture = modelFile[texturePos..textureEndPos].chompPrefix("./").chomp(".png");
+			if (texture.canFind('/')) {
+				texture = "%s/assets/minecraft/%s.png".format(filename,texture);
+			} else {
+				texture = modelFromPath[0..modelFromPath.lastIndexOf("/")+1]~"%s.png".format(texture);
+			}
+		} else {
+			texture = texture.chompPrefix("./").chomp(".png")~".png";
+			if (texture.canFind('/')) {
+				texture = "%s/assets/minecraft/%s".format(filename,texture);
+			} else {
+				texture = (path[0..$ - 1] ~ texture).join('/');
+			}
+		}
+		copyTexture(texture, subPath);
+		texture = texture.split("/")[$ - 1].chomp(".png");
+		string editedModel = modelFile[0..texturePos] ~
+			"%s:item/%s".format(namespace, subPath ~ "/" ~ texture) ~
+			modelFile[textureEndPos..$];
+		std.file.write(modelToPath,editedModel);
+
+	return "%s:item/%s/%s".format(namespace, subPath, sanitize(model.split('/')[$ - 1][0..$ - 5]));
+}
+
 
 void copyTexture(string texture, string subPath) {
 	string itemName = sanitize(texture.split('/')[$ - 1].chomp(".png"));
@@ -265,8 +273,28 @@ void generateOverride(Identifier item, Override[] overrides) {
 	std.file.write(generatePath(item.namespace, "overrides", "item")~"/%s.json".format(item.path), STUB_OVERRIDE
 		.format(overrides
 			.map!(o => STUB_PREDICATE
-				.format(o.predicates.join(",\n"), o.model))
+				.format(o.predicates.join(",\n"), "model", o.model))
 			.array.join(",\n")));
+}
+
+string generatePredicateNbt(Nbt nbt) {
+	string nbtData = nbt.nbttag.split(':')[1..$].join(":");			
+	if (matchFirst(nbt.nbttag,"i?pattern|i?regex")) {
+		if (matchFirst(nbt.nbttag,"i?pattern")) {
+		nbtData = nbtData.replace("*",".*");
+		}
+
+		if (startsWith(nbt.nbttag,"i")) {
+			nbtData = "(?i)%s".format(nbtData);
+		}
+		nbt.nbttag = "/%s/".format(nbtData);
+	}
+
+	string p = "%s";
+	foreach(string nbtelement; nbt.nbtpath) {
+		p = p.format(`"%s": `.format(nbtelement)~"{%s}");
+	}
+	return p.replace("{%s}",`"%s"`.format(nbt.nbttag));
 }
 
 string generatePath(string nspace, string pathType, string type, string subPath = null) {
@@ -282,6 +310,7 @@ struct Override {
 	string[] predicates;
 	string model;
 	int weight;
+	Type type;
 }
 
 struct Nbt {
@@ -323,7 +352,7 @@ struct Identifier {
 	}
 }
 
-enum Type {
+enum Type : string {
 	ITEM = "item",
 	ENCHANTMENT = "enchantment",
 	ARMOR = "armor",
