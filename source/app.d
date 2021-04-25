@@ -121,6 +121,7 @@ void attemptConversion(string file) {
 		}
 	}
 	string subPath = sanitize(file.split("/")[citDir.split("/").length..$-1].join("/"));
+	if (subPath != "") { subPath ~= "/"; }
 	switch(type){
 		case Type.ITEM:
 
@@ -203,60 +204,72 @@ string generateModel(Identifier[] vanillaItems, string texture, string[] path, s
 			stub = STUB_MODEL_HANDHELD;
 		}
 	}
-	string file = generatePath(namespace, "models", "item", subPath) ~ "/%s.%s".format(itemName, "json");
+	string file = generatePath(namespace, "models", "item", subPath) ~ "%s.%s".format(itemName, "json");
 
 	std.file.write(file, stub
-		.format(namespace, subPath~"/"~itemName));
+		.format(namespace, subPath~itemName));
 
-	return "%s:item/%s/%s".format(namespace, subPath, itemName);
+	return "%s:item/%s%s".format(namespace, subPath, itemName);
 }
 
 string editModel(string model, string texture, string[] path, string subPath) {
-
 
 	model = chompPrefix(model, "./");
 	if (!model.endsWith(".json")) {
 		model ~= ".json";
 	}
 	string modelFromPath = (path[0..$ - 1] ~ model).join('/');
-	string modelToPath = generatePath(namespace, "models", "item", subPath)~"/%s".format(model);
+	string modelToPath = generatePath(namespace, "models", "item", subPath)~"%s".format(model);
+	model = "%s:item/%s%s".format(namespace, subPath, sanitize(model.split('/')[$ - 1][0..$ - 5]));
 	string modelFile = cast(string) read(modelFromPath);
-	auto texturePos = indexOf(modelFile, `"layer0"`, 0);
-	if (texturePos == -1) {
-		throw new Exception("Chime Converter does not support custom models without a texture");
+	int[] texturePos;
+	try {
+		texturePos = findValue(modelFile, `"layer0"`);
+	} catch (Exception e) {
+		//Custom model without texture
+		std.file.write(modelToPath, modelFile);
+		return model;
 	}
-	texturePos = indexOf(modelFile, `"`, texturePos + 8) + 1;
-	auto textureEndPos = indexOf(modelFile, `"`, texturePos + 1);
-		
-	if (!texture) {
-			texture = modelFile[texturePos..textureEndPos].chompPrefix("./").chomp(".png");
-			if (texture.canFind('/')) {
-				texture = "%s/assets/minecraft/%s.png".format(filename,texture);
-			} else {
-				texture = modelFromPath[0..modelFromPath.lastIndexOf("/")+1]~"%s.png".format(texture);
-			}
-		} else {
-			texture = texture.chompPrefix("./").chomp(".png")~".png";
-			if (texture.canFind('/')) {
-				texture = "%s/assets/minecraft/%s".format(filename,texture);
-			} else {
-				texture = (path[0..$ - 1] ~ texture).join('/');
-			}
-		}
-		copyTexture(texture, subPath);
-		texture = texture.split("/")[$ - 1].chomp(".png");
-		string editedModel = modelFile[0..texturePos] ~
-			"%s:item/%s".format(namespace, subPath ~ "/" ~ texture) ~
-			modelFile[textureEndPos..$];
-		std.file.write(modelToPath,editedModel);
 
-	return "%s:item/%s/%s".format(namespace, subPath, sanitize(model.split('/')[$ - 1][0..$ - 5]));
+	if (!texture) {
+		texture = modelFile[texturePos[0]..texturePos[1]].chompPrefix("./").chomp(".png");
+		if (texture.canFind('/')) {
+			texture = "%s/assets/minecraft/%s.png".format(filename,texture);
+		} else {
+			texture = modelFromPath[0..modelFromPath.lastIndexOf("/")+1]~"%s.png".format(texture);
+		}
+	} else {
+		texture = texture.chompPrefix("./").chomp(".png")~".png";
+		if (texture.canFind('/')) {
+			texture = "%s/assets/minecraft/%s".format(filename,texture);
+		} else {
+			texture = (path[0..$ - 1] ~ texture).join('/');
+		}
+	}
+	copyTexture(texture, subPath);
+	texture = texture.split("/")[$ - 1].chomp(".png");
+	string editedModel = modelFile[0..texturePos[0]] ~
+		"%s:item/%s".format(namespace, subPath ~ texture) ~
+		modelFile[texturePos[1]..$];
+	std.file.write(modelToPath,editedModel);
+	
+	return model;
 }
 
+int[] findValue(string file, string prop) {
+	int pos1 = to!int(indexOf(file, prop));
+	if (pos1 == -1) {
+		throw new Exception("Cannot find property %s in file %s".format(prop, file));
+	} else {
+		pos1 = to!int(indexOf(file, `"`, pos1 + prop.length) + 1);
+
+		return [pos1, to!int(indexOf(file, `"`, pos1 + 1))];
+	}
+}
 
 void copyTexture(string texture, string subPath) {
 	string itemName = sanitize(texture.split('/')[$ - 1].chomp(".png"));
-	string path = generatePath(namespace, "textures", "item", subPath) ~ "/%s.png".format(itemName);
+	string path = generatePath(namespace, "textures", "item", subPath) ~ "%s.png".format(itemName);
 	if (itemName == "null") {
 		writefln("Skipping copying "~texture);
 		return;
@@ -270,7 +283,7 @@ void copyTexture(string texture, string subPath) {
 void generateOverride(Identifier item, Override[] overrides) {
 	writefln("Generating Override %s:%s", item.namespace, item.path);
 	sort!((a,b)=>a.weight < b.weight)(overrides);
-	std.file.write(generatePath(item.namespace, "overrides", "item")~"/%s.json".format(item.path), STUB_OVERRIDE
+	std.file.write(generatePath(item.namespace, "overrides", "item")~"%s.json".format(item.path), STUB_OVERRIDE
 		.format(overrides
 			.map!(o => STUB_PREDICATE
 				.format(o.predicates.join(",\n"), "model", o.model))
@@ -285,7 +298,7 @@ string generatePredicateNbt(Nbt nbt) {
 		}
 
 		if (startsWith(nbt.nbttag,"i")) {
-			nbtData = "(?i)%s".format(nbtData);
+			nbtData = "(?i)" ~ nbtData;
 		}
 		nbt.nbttag = "/%s/".format(nbtData);
 	}
@@ -298,9 +311,9 @@ string generatePredicateNbt(Nbt nbt) {
 }
 
 string generatePath(string nspace, string pathType, string type, string subPath = null) {
-	string path = "%s/assets/%s/%s/%s".format(outFilename, nspace, pathType, type);
+	string path = "%s/assets/%s/%s/%s/".format(outFilename, nspace, pathType, type);
 	if (subPath) {
-		path ~= "/" ~ subPath;
+		path ~= subPath;
 	}
 	path.mkdirRecurse();
 	return path;
