@@ -12,6 +12,8 @@ chime-converter-test-*
 *.o
 *.obj
 *.lst
+*.zip
 in/
+in*
 out/
 out.zip
