@@ -172,10 +172,9 @@ void generatePredicate(ConversionFile cFile) {
 			} else if (cFile.type == Type.ARMOR) {
 				cFile.items = [];
 			}
-			
-			foreach (Identifier item; cFile.items) {
-				if (item.path == "skull") {
-					item.path = "player_head";
+			for (int i = 0; i < cFile.items.length; i++) {
+				if (cFile.items[i].path == "skull") {
+					cFile.items[i].path = "player_head";
 					cFile.damages = [];
 				}
 			}
