@@ -7,9 +7,8 @@ Currently WIP, only functions for certain overrides.
 
 Usage:
 -------------
-extract your resource pack, and rename it to in<br/>
+extract your resource pack, and rename it to `in` in the same directory as chime-converter.exe<br/>
 run chime-converter.exe<br/>
-copy `pack.mcmeta` and `pack.png` from `in` to `out`
 
 Building:
 -------------
